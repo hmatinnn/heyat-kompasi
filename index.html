@@ -167,7 +167,12 @@ svg text{font-family:var(--body);fill:var(--muted)}
 .list .crow .sw{width:12px;height:12px;border-radius:50%;background:var(--cc)}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:760px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+#tip{position:fixed;z-index:30;pointer-events:none;background:var(--fg);color:var(--bg);font-size:12.5px;line-height:1.35;padding:6px 9px;border-radius:7px;box-shadow:var(--shadow);max-width:240px;opacity:0;transition:opacity .12s;white-space:pre-line;font-variant-numeric:tabular-nums}
+#tip.show{opacity:1}
+[data-tip]{cursor:pointer}
+svg .hit{fill:transparent}
+svg .hit:hover{fill:var(--fg);fill-opacity:.06}
+@media (prefers-reduced-motion: reduce){.toast,#tip{transition:none}}
 </style>
 
 <div class="wrap">
@@ -196,6 +201,7 @@ svg text{font-family:var(--body);fill:var(--muted)}
   <section class="view" id="view-hedefler" hidden></section>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<div id="tip" role="tooltip"></div>
 
 <script>
 'use strict';
@@ -259,6 +265,16 @@ function f0(n){return n==null?'—':Math.round(n).toLocaleString('az-AZ')}
 function pct(n){return n==null?'—':Math.round(n)+'%'}
 function grade(ratio){if(ratio==null)return 'none';return ratio>=1?'good':ratio>=.7?'warn':'bad'}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200)}
+const Tip={el:null,cur:null,
+  init(){this.el=document.getElementById('tip');
+    document.addEventListener('mouseover',e=>{const t=e.target.closest('[data-tip]');if(t)this.show(t,e.clientX,e.clientY)});
+    document.addEventListener('mousemove',e=>{if(this.cur&&e.target.closest('[data-tip]')===this.cur)this.move(e.clientX,e.clientY)});
+    document.addEventListener('mouseout',e=>{const t=e.target.closest('[data-tip]');if(t&&!t.contains(e.relatedTarget))this.hide()});
+    document.addEventListener('touchstart',e=>{const t=e.target.closest('[data-tip]');if(t){const p=e.touches[0];this.show(t,p.clientX,p.clientY);clearTimeout(this.t);this.t=setTimeout(()=>this.hide(),2500)}else this.hide()},{passive:true});
+    document.addEventListener('scroll',()=>this.hide(),{passive:true});},
+  show(t,x,y){this.cur=t;this.el.textContent=t.dataset.tip;this.el.classList.add('show');this.move(x,y)},
+  move(x,y){const r=this.el.getBoundingClientRect();let left=x+12,top=y-r.height-10;if(left+r.width>window.innerWidth-8)left=x-r.width-12;if(top<8)top=y+16;this.el.style.left=left+'px';this.el.style.top=top+'px'},
+  hide(){this.cur=null;this.el.classList.remove('show')}};
 function lastNDays(n){const t=todayStr();const a=[];for(let i=n-1;i>=0;i--)a.push(addDays(t,-i));return a}
 
 /* ---------- storage: Firebase (Google ilə giriş + Firestore) ---------- */
@@ -373,16 +389,17 @@ function stats(){
 }
 
 /* ---------- charts ---------- */
-function sparkline(vals,min,max,target){
+function sparkline(vals,min,max,target,tips){
   const w=240,h=56,n=vals.length;const x=i=>4+i*(w-8)/Math.max(1,n-1);const y=v=>h-4-(v-min)/(max-min)*(h-10);
   let d='',area='',first=null,last=null;
   vals.forEach((v,i)=>{if(v==null)return;const p=x(i)+' '+y(v);d+=(d?' L':'M')+p;if(first==null)first=i;last=i});
   if(d&&first!=null)area=d+' L'+x(last)+' '+(h-2)+' L'+x(first)+' '+(h-2)+' Z';
   const tl=target!=null?`<line x1="0" x2="${w}" y1="${y(target)}" y2="${y(target)}" stroke="var(--faint)" stroke-dasharray="3 3" stroke-width="1"/>`:'';
   const dots=last!=null&&vals[last]!=null?`<circle cx="${x(last)}" cy="${y(vals[last])}" r="3" fill="var(--accent)"/>`:'';
-  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="56" aria-hidden="true">${tl}<path d="${area}" fill="var(--accent)" opacity=".15"/><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>${dots}</svg>`;
+  let hits='';if(tips){const cw=(w-8)/Math.max(1,n-1);vals.forEach((v,i)=>{hits+=`<rect class="hit" x="${x(i)-cw/2}" y="0" width="${cw}" height="${h}" data-tip="${esc(tips[i])}"/>`;if(v!=null)hits+=`<circle cx="${x(i)}" cy="${y(v)}" r="2" fill="var(--accent)" opacity=".6" pointer-events="none"/>`})}
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="56" aria-hidden="true">${tl}<path d="${area}" fill="var(--accent)" opacity=".15"/><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>${dots}${hits}</svg>`;
 }
-function barChart(vals,labels,max,target,unit){
+function barChart(vals,labels,max,target,unit,tips){
   const w=560,h=150,pl=30,pb=22,n=vals.length,bw=(w-pl-8)/n;
   const y=v=>h-pb-(v/max)*(h-pb-12);
   let out=`<svg viewBox="0 0 ${w} ${h}" width="100%" aria-hidden="true">`;
@@ -390,6 +407,7 @@ function barChart(vals,labels,max,target,unit){
   vals.forEach((v,i)=>{if(v==null)return;const c=target!=null?(v>=target?'var(--accent)':'var(--warn)'):'var(--accent)';out+=`<rect x="${pl+i*bw+1}" y="${y(v)}" width="${Math.max(2,bw-2)}" height="${h-pb-y(v)}" rx="2" fill="${c}"/>`});
   if(target!=null)out+=`<line x1="${pl}" x2="${w}" y1="${y(target)}" y2="${y(target)}" stroke="var(--fg)" stroke-dasharray="4 3" stroke-width="1"/>`;
   labels.forEach((l,i)=>{if(l)out+=`<text x="${pl+i*bw+bw/2}" y="${h-6}" font-size="10" text-anchor="middle">${l}</text>`});
+  if(tips)vals.forEach((v,i)=>{out+=`<rect class="hit" x="${pl+i*bw}" y="0" width="${bw}" height="${h-pb}" data-tip="${esc(tips[i])}"/>`});
   return out+'</svg>';
 }
 function radar(cur,prev){
@@ -399,7 +417,7 @@ function radar(cur,prev){
   [2,4,6,8,10].forEach(l=>{out+=`<polygon points="${ASPECTS.map((_,i)=>pt(i,l).join(',')).join(' ')}" fill="none" stroke="var(--line)"/>`});
   ASPECTS.forEach((a,i)=>{const [x,y]=pt(i,10);out+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)"/>`;const [lx,ly]=pt(i,11.8);const anc=Math.abs(lx-cx)<8?'middle':lx>cx?'start':'end';out+=`<text x="${lx}" y="${ly+4}" font-size="11" text-anchor="${anc}">${esc(SHORT[i])}</text>`});
   if(prev)out+=`<polygon points="${prev.map((v,i)=>pt(i,v).join(',')).join(' ')}" fill="none" stroke="var(--faint)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
-  if(cur){out+=`<polygon points="${cur.map((v,i)=>pt(i,v).join(',')).join(' ')}" fill="var(--accent)" fill-opacity=".2" stroke="var(--accent)" stroke-width="2"/>`;cur.forEach((v,i)=>{const [x,y]=pt(i,v);out+=`<circle cx="${x}" cy="${y}" r="3" fill="var(--accent)"/>`})}
+  if(cur){out+=`<polygon points="${cur.map((v,i)=>pt(i,v).join(',')).join(' ')}" fill="var(--accent)" fill-opacity=".2" stroke="var(--accent)" stroke-width="2"/>`;cur.forEach((v,i)=>{const [x,y]=pt(i,v);out+=`<circle cx="${x}" cy="${y}" r="3" fill="var(--accent)" pointer-events="none"/><circle cx="${x}" cy="${y}" r="11" class="hit" data-tip="${esc(ASPECTS[i][0]+': '+v+'/10'+(prev?' (əvvəlki ay '+prev[i]+')':'')+'\n'+ASPECTS[i][1])}"/>`})}
   return out+'</svg>';
 }
 
@@ -417,12 +435,13 @@ function renderPanel(){
   const td=S.days[todayStr()];
   h+=`<div class="today"><div><b>${td?'Bu gün qeyd olunub':'Bu gün hələ qeyd olunmayıb'}</b><div class="small muted">${td?`Yuxu ${f1(td.sleep)} s · Əhval ${td.mood??'—'}/5 · ${T.habits.filter(x=>td.habits&&td.habits[x]).length}/${T.habits.length} vərdiş`:'2 dəqiqəlik qeyd: yuxu, əhval, vərdişlər'}</div></div><a class="btn ${td?'':'primary'} sm" href="#gundelik" style="text-decoration:none">${td?'Dəyiş':'Qeyd et'}</a></div>`;
 
-  const mood30=lastNDays(30).map(d=>S.days[d]?.mood??null);
+  const d30p=lastNDays(30),mood30=d30p.map(d=>S.days[d]?.mood??null);
+  const moodTips=d30p.map(d=>{const e=S.days[d];return fmtDate(d)+(e&&e.mood?`\nƏhval ${e.mood}/5 · Enerji ${e.energy??'—'} · Stress ${e.stress??'—'}`:'\nQeyd yoxdur')});
   h+=`<div class="section"><h2>Son 30 gün</h2><div class="grid g6">`;
   h+=tile('Yuxu (orta)',f1(r.sleep),'saat',`Hədəf ${f1(T.sleep)} s`,r.sleep!=null?r.sleep/T.sleep:null);
   h+=tile('Addım (orta)',f0(r.steps),'',`Hədəf ${f0(T.steps)}`,r.steps!=null?r.steps/T.steps:null);
   h+=tile('Hərəkət, bu həftə',f0(r.exWeek),'dəq',`Hədəf ${T.exercise} dəq/həftə`,r.exWeek/T.exercise);
-  h+=tile('Əhval (orta)',f1(r.mood),'/5',`Enerji ${f1(r.energy)} · Stress ${f1(r.stress)}`,null,sparkline(mood30,1,5,null));
+  h+=tile('Əhval (orta)',f1(r.mood),'/5',`Enerji ${f1(r.energy)} · Stress ${f1(r.stress)}`,null,sparkline(mood30,1,5,null,moodTips));
   h+=tile('Vərdişlər',pct(r.habit),'',`${T.habits.length} vərdiş · ${r.logged} gün qeyd`,r.habit!=null?r.habit/80:null);
   h+=tile('Ardıcıl qeyd',r.streak,'gün',r.streak>=7?'Yaxşı ritm':'Hər gün 2 dəqiqə',null);
   h+=`</div></div>`;
@@ -439,14 +458,14 @@ function renderPanel(){
   h+=`<div class="panel"><h2>10 həyat sahəsi</h2><p class="small muted">${cm?fmtMonth(ms[ms.length-1])+(pm?' və '+fmtMonth(ms[ms.length-2])+' (kəsik xətt)':''):'Aylıq bölmədə sahələrə bal verin'}</p>${radar(cm?.scores,pm?.scores)}${cm?`<div class="legend"><span>Orta bal: <b class="num">${f1(avg(cm.scores))}</b>/10</span><span>Ən aşağı: <b>${esc(ASPECTS[cm.scores.indexOf(Math.min(...cm.scores))][0])}</b> (${Math.min(...cm.scores)})</span></div>`:''}</div>`;
   const d28=lastNDays(28);
   h+=`<div class="panel"><h2>Vərdişlər, son 4 həftə</h2><p class="small muted">Hər xana bir gündür; soldan sağa köhnədən bu günə</p><div class="heat" style="grid-template-columns:minmax(70px,120px) repeat(28,minmax(0,1fr));margin-top:12px">`;
-  T.habits.forEach(hb=>{h+=`<div class="hl" title="${esc(hb)}">${esc(hb)}</div>`;d28.forEach(d=>{const e=S.days[d];const c=!e?'':(e.habits&&e.habits[hb])?'on':'off';h+=`<div class="c ${c}${d===todayStr()?' today':''}" title="${fmtDate(d)}"></div>`})});
+  T.habits.forEach(hb=>{h+=`<div class="hl" title="${esc(hb)}">${esc(hb)}</div>`;d28.forEach(d=>{const e=S.days[d];const c=!e?'':(e.habits&&e.habits[hb])?'on':'off';h+=`<div class="c ${c}${d===todayStr()?' today':''}" data-tip="${esc(fmtDate(d)+'\n'+hb+': '+(c==='on'?'edildi':c==='off'?'edilmədi':'qeyd yoxdur'))}"></div>`})});
   h+=`</div><div class="legend"><span><i style="background:var(--accent)"></i>edildi</span><span><i style="background:var(--bad-soft)"></i>edilmədi</span><span><i style="background:var(--surface-2)"></i>qeyd yoxdur</span></div></div>`;
   h+=`</div>`;
 
   const d30=lastNDays(30),lbl=d30.map((d,i)=>i%5===0?new Date(d+'T12:00:00').getDate():'' );
   h+=`<div class="section grid g2 stack">`;
-  h+=`<div class="panel"><h2>Yuxu, 30 gün</h2><p class="small muted">Kəsik xətt hədəfdir (${f1(T.sleep)} s); sarı sütun hədəfdən aşağıdır</p>${barChart(d30.map(d=>S.days[d]?.sleep??null),lbl,10,T.sleep,'')}</div>`;
-  h+=`<div class="panel"><h2>Hərəkət, 30 gün</h2><p class="small muted">Dəqiqə ilə; həftəlik cəm hədəfi ${T.exercise} dəq</p>${barChart(d30.map(d=>S.days[d]?.exercise??null),lbl,90,null,'')}</div>`;
+  h+=`<div class="panel"><h2>Yuxu, 30 gün</h2><p class="small muted">Kəsik xətt hədəfdir (${f1(T.sleep)} s); sarı sütun hədəfdən aşağıdır</p>${barChart(d30.map(d=>S.days[d]?.sleep??null),lbl,10,T.sleep,'',d30.map(d=>{const v=S.days[d]?.sleep;return fmtDate(d)+(v!=null?`\nYuxu ${f1(v)} saat · hədəf ${f1(T.sleep)} (${v>=T.sleep?'✓':'−'+f1(T.sleep-v)+' s'})`:'\nQeyd yoxdur')}))}</div>`;
+  h+=`<div class="panel"><h2>Hərəkət, 30 gün</h2><p class="small muted">Dəqiqə ilə; həftəlik cəm hədəfi ${T.exercise} dəq</p>${barChart(d30.map(d=>S.days[d]?.exercise??null),lbl,90,null,'',d30.map(d=>{const v=S.days[d]?.exercise;return fmtDate(d)+(S.days[d]?`\nHərəkət ${v||0} dəq`:'\nQeyd yoxdur')}))}</div>`;
   h+=`</div>`;
 
   if(ms.length){
@@ -549,15 +568,16 @@ function expBar(vals,labels,opts){
   const y=v=>h-pb-(v/max)*(h-pb-12),step=niceStep(max);
   let out=`<svg viewBox="0 0 ${w} ${h}" width="100%" aria-hidden="true">`;
   for(let g=0;g<=max;g+=step)out+=`<line x1="${pl}" x2="${w}" y1="${y(g)}" y2="${y(g)}" stroke="var(--line)"/><text x="${pl-6}" y="${y(g)+4}" font-size="10" text-anchor="end">${money(g)}</text>`;
-  vals.forEach((v,i)=>{if(!v)return;const c=o.target!=null?(v<=o.target?'var(--accent)':'var(--bad)'):'var(--accent)';out+=`<rect x="${pl+i*bw+1}" y="${y(v)}" width="${Math.max(2,bw-2)}" height="${h-pb-y(v)}" rx="2" fill="${c}"><title>${labels[i]||''}: ${money(v,2)} ₼</title></rect>`});
+  vals.forEach((v,i)=>{if(!v)return;const c=o.target!=null?(v<=o.target?'var(--accent)':'var(--bad)'):'var(--accent)';out+=`<rect x="${pl+i*bw+1}" y="${y(v)}" width="${Math.max(2,bw-2)}" height="${h-pb-y(v)}" rx="2" fill="${c}"/>`});
   if(o.target!=null)out+=`<line x1="${pl}" x2="${w}" y1="${y(o.target)}" y2="${y(o.target)}" stroke="var(--fg)" stroke-dasharray="4 3" stroke-width="1"/>`;
   labels.forEach((l,i)=>{if(l&&(o.allLabels||i%Math.ceil(n/8)===0))out+=`<text x="${pl+i*bw+bw/2}" y="${h-6}" font-size="10" text-anchor="middle">${esc(l)}</text>`});
+  vals.forEach((v,i)=>{const tip=o.tips?o.tips[i]:(labels[i]||'')+': '+money(v||0,2)+' ₼';out+=`<rect class="hit" x="${pl+i*bw}" y="0" width="${bw}" height="${h-pb}" data-tip="${esc(tip)}"/>`});
   return out+'</svg>';
 }
 function donut(parts){
   const total=parts.reduce((p,c)=>p+c.v,0);if(!total)return '';
   const r=44,cx=60,cy=60,C=2*Math.PI*r;let off=0,out=`<svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">`;
-  parts.forEach(p=>{const len=p.v/total*C;out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--c${p.color})" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cy})"/>`;off+=len});
+  parts.forEach(p=>{const len=p.v/total*C;out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--c${p.color})" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cy})" data-tip="${esc((p.name||'')+'\n'+money(p.v,2)+' ₼ · '+pct(p.v/total*100))}"/>`;off+=len});
   return out+'</svg>';
 }
 function expTile(label,val,unit,sub,ratio){
@@ -598,7 +618,7 @@ function renderExpenses(){
   h+=expTile('Son 30 gün',money(sum30),'₼',`${under}/30 gün limit daxilində`,budget?(sum30/30)/dayLimit:null);
   h+=expTile('Ayın qalanı',money(Math.max(0,leftBudget)),'₼',leftBudget>=0?`${leftDays} gün · gündə ${money(leftBudget/leftDays,1)} ₼`:`Büdcə ${money(-leftBudget)} ₼ aşılıb`,null);
   h+=`</div></div>`;
-  h+=`<div class="section panel"><h2>Son 30 gün, gündəlik xərc</h2><p class="small muted">Kəsik xətt gündəlik limitdir (aylıq büdcə ÷ ${dim}); qırmızı sütun limiti aşıb</p><div style="margin-top:8px">${expBar(tot30,d30.map(d=>new Date(d+'T12:00:00').getDate()),{target:budget?dayLimit:null})}</div></div>`;
+  h+=`<div class="section panel"><h2>Son 30 gün, gündəlik xərc</h2><p class="small muted">Kəsik xətt gündəlik limitdir (aylıq büdcə ÷ ${dim}); qırmızı sütun limiti aşıb</p><div style="margin-top:8px">${expBar(tot30,d30.map(d=>new Date(d+'T12:00:00').getDate()),{target:budget?dayLimit:null,tips:d30.map(d=>{const its=S.exp[d]?.items||[];const bc=byCat(its);const top=Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>catById(k).name+' '+money(v,2)).join(', ');return fmtDate(d)+'\n'+(its.length?money(expDay(d),2)+' ₼ · '+its.length+' əməliyyat'+(budget?' · limit '+money(dayLimit)+' ₼':'')+'\n'+top:'Xərc yoxdur')})})}</div></div>`;
   h+=`<div class="section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h2>Aylıq göstəricilər · ${fmtMonth(ym)}</h2><input type="month" id="xMonth" value="${ym}" max="${curYm}" style="width:auto"></div><div class="grid g4">`;
   h+=expTile('Xərclənib',money(total),'₼',`Büdcə ${money(budget)} ₼ · ${pct(budget?total/budget*100:null)}`,budget?total/budget:null);
   h+=expTile(isCur?'Ay sonu proqnozu':'Gündəlik orta',isCur?money(proj):money(total/dimS,1),'₼',isCur?`${elapsed} günün tempi ilə`:`${dimS} günə bölünüb`,isCur&&budget?proj/budget:null);
@@ -606,10 +626,10 @@ function renderExpenses(){
   h+=expTile('Ən böyük kateqoriya',top?esc(catById(top[0]).name):'—','',top?`${money(top[1])} ₼ · ${pct(top[1]/total*100)} payı`:'',null);
   h+=`</div></div>`;
   h+=`<div class="section grid g2 stack">`;
-  h+=`<div class="panel"><h2>Kateqoriyalar üzrə</h2><p class="small muted">Hər kateqoriyanın öz büdcəsi ilə müqayisə</p><div style="display:flex;gap:16px;align-items:flex-start;margin-top:10px;flex-wrap:wrap"><div style="flex:0 0 120px">${donut(S.cats.filter(c=>bc[c.id]).map(c=>({v:bc[c.id],color:c.color})))}</div><div style="flex:1;min-width:220px">`;
+  h+=`<div class="panel"><h2>Kateqoriyalar üzrə</h2><p class="small muted">Hər kateqoriyanın öz büdcəsi ilə müqayisə</p><div style="display:flex;gap:16px;align-items:flex-start;margin-top:10px;flex-wrap:wrap"><div style="flex:0 0 120px">${donut(S.cats.filter(c=>bc[c.id]).map(c=>({v:bc[c.id],color:c.color,name:c.name})))}</div><div style="flex:1;min-width:220px">`;
   [...S.cats].sort((a,b)=>(bc[b.id]||0)-(bc[a.id]||0)).forEach(c=>{const v=bc[c.id]||0,r=c.budget?v/c.budget:null,g=spendGrade(r);h+=`<div class="catrow" style="${cc(c)}"><i class="dot"></i><span>${esc(c.name)}</span><span class="v num">${money(v)} ₼ <small>/ ${money(c.budget)}</small></span><div class="bar ${g}"><b style="width:${r==null?0:Math.min(100,r*100)}%"></b></div></div>`});
   h+=`</div></div></div>`;
-  h+=`<div class="panel"><h2>Son 6 ay</h2><p class="small muted">Aylıq cəm; kəsik xətt ümumi büdcədir</p><div style="margin-top:8px">${expBar(last6.map(k=>expMonth(k)),last6.map(k=>MONTHS[+k.split('-')[1]-1]),{target:budget||null,allLabels:true})}</div><p class="hint" style="margin-top:10px">Aylıq cəm Aylıq bölmədəki "Xərc" sahəsinə və panelin maliyyə göstəricilərinə avtomatik ötürülür.</p></div>`;
+  h+=`<div class="panel"><h2>Son 6 ay</h2><p class="small muted">Aylıq cəm; kəsik xətt ümumi büdcədir</p><div style="margin-top:8px">${expBar(last6.map(k=>expMonth(k)),last6.map(k=>MONTHS[+k.split('-')[1]-1]),{target:budget||null,allLabels:true,tips:last6.map(k=>fmtMonth(k)+'\n'+money(expMonth(k),2)+' ₼'+(budget?' · büdcənin '+pct(expMonth(k)/budget*100):''))})}</div><p class="hint" style="margin-top:10px">Aylıq cəm Aylıq bölmədəki "Xərc" sahəsinə və panelin maliyyə göstəricilərinə avtomatik ötürülür.</p></div>`;
   h+=`</div>`;
   h+=`<div class="section panel"><h2>${fmtMonth(ym)} xərcləri <span class="muted small" style="font-family:var(--body);font-weight:600">· ${items.length} əməliyyat</span></h2><div style="margin-top:4px">${itemsList(items)}</div></div>`;
   el.innerHTML=h;
@@ -695,7 +715,7 @@ window.addEventListener('hashchange',route);
 
 (async function start(){
   const t=new Date();document.getElementById('todayLine').textContent=t.getDate()+' '+MONTHS[t.getMonth()]+' '+t.getFullYear()+', '+['bazar','bazar ertəsi','çərşənbə axşamı','çərşənbə','cümə axşamı','cümə','şənbə'][t.getDay()];
-  route();renderAll();
+  Tip.init();route();renderAll();
   let timer=setTimeout(()=>{document.getElementById('status').querySelector('span').textContent='Məlumat hələ yüklənmir…'},10000);
   await Store.init();
   try{S=await Store.load()}catch(e){console.error(e);S=Store.loadLocal()}
