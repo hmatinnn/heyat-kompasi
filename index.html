@@ -800,14 +800,16 @@ function renderTargets(){
     <h3 style="margin-top:18px">Gündəlik vərdişlər</h3>
     <p class="hint">5–7 vərdiş kifayətdir. Adı dəyişsəniz köhnə günlərin qeydi yeni ada bağlanmır.</p>
     <div class="list" id="tHabits" style="margin-top:8px">${T.habits.map((hb,i)=>`<div class="row"><input type="text" value="${esc(hb)}" id="th${i}" maxlength="40"><button class="btn sm ghost danger" data-rm="${i}" aria-label="Sil">✕</button></div>`).join('')}</div>
+    <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAdd" ${T.habits.length>=8?'disabled':''}>+ Vərdiş əlavə et</button></div>
     <h3 style="margin-top:18px">Həyat sahələri (aylıq bal)</h3>
     <p class="hint">Psixoloji sağlamlıq və Maliyyə avtomatik hesablanır, siyahıda deyil. Ən çox 8 sahə. Sahəni silsəniz keçmiş ayların balı qalır, amma göstərilmir.</p>
     <div class="list" id="tAreas" style="margin-top:8px">${(T.areas||defaultAreas()).map((a,i)=>`<div class="row" data-id="${esc(a.id)}" style="display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px"><input type="text" value="${esc(a.name)}" maxlength="30" placeholder="Ad" aria-label="Sahə adı"><input type="text" value="${esc(a.desc||'')}" maxlength="60" placeholder="Qısa izah" aria-label="İzah"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
-    <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAddArea" ${(T.areas||[]).length>=8?'disabled':''}>+ Sahə</button></div>
+    <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAddArea" ${(T.areas||[]).length>=8?'disabled':''}>+ Sahə əlavə et</button></div>
     <h3 style="margin-top:18px">Xərc kateqoriyaları və aylıq büdcə</h3>
     <p class="hint">Ümumi büdcə kateqoriyaların cəmidir: <b class="num" id="tTotal">${money(totalBudget())} ₼</b>. Gündəlik limit bundan hesablanır.</p>
     <div class="list" id="tCats" style="margin-top:8px">${S.cats.map((c,i)=>`<div class="crow" data-id="${c.id}" data-color="${c.color}" style="${cc(c)}"><i class="sw"></i><input type="text" value="${esc(c.name)}" maxlength="30" aria-label="Ad" id="cn${i}"><input type="number" min="0" step="10" value="${c.budget}" inputmode="decimal" aria-label="Büdcə, ₼" id="cb${i}" class="num"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
-    <div class="actions"><button class="btn sm" id="tAdd" ${T.habits.length>=8?'disabled':''}>+ Vərdiş</button><button class="btn sm" id="tAddCat" ${S.cats.length>=12?'disabled':''}>+ Kateqoriya</button><button class="btn primary" id="tSave">Saxla</button></div>
+    <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAddCat" ${S.cats.length>=12?'disabled':''}>+ Kateqoriya əlavə et</button></div>
+    <div class="actions" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)"><button class="btn primary" id="tSave">Saxla</button><span class="hint">Bütün hədəflər, vərdişlər, sahələr və kateqoriyalar birlikdə saxlanılır</span></div>
    </div>
    <div class="panel">
     <h2>Məlumatlar</h2>
