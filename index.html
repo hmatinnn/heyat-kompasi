@@ -189,7 +189,10 @@ svg text{font-family:var(--body);fill:var(--muted)}
 .catrow .bar{grid-column:2/-1;margin-top:2px}
 .catrow .v{font-family:var(--display);font-weight:700;white-space:nowrap}
 .catrow .v small{font-family:var(--body);font-weight:600;color:var(--muted);font-size:12px}
-.list .crow{display:grid;grid-template-columns:12px 1fr 110px auto;gap:8px;align-items:center}
+.list .crow{display:grid;grid-template-columns:auto 12px 1fr 110px auto;gap:8px;align-items:center}
+.drag{cursor:grab;touch-action:none;user-select:none;color:var(--faint);font-size:16px;line-height:1;padding:8px 4px;border-radius:6px;flex:none}
+.drag:hover{color:var(--fg);background:var(--surface-2)}
+.dragging{opacity:.55;outline:2px dashed var(--accent);outline-offset:2px;border-radius:8px}
 .list .crow .sw{width:12px;height:12px;border-radius:50%;background:var(--cc)}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:760px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -804,13 +807,13 @@ function renderTargets(){
     <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAdd" ${T.habits.length>=8?'disabled':''}>+ Vərdiş əlavə et</button></div>
     <h3 style="margin-top:18px">Həyat sahələri (aylıq bal)</h3>
     <p class="hint">Psixoloji sağlamlıq və Maliyyə avtomatik hesablanır, siyahıda deyil. Ən çox 8 sahə. Sahəni silsəniz keçmiş ayların balı qalır, amma göstərilmir.</p>
-    <div class="list" id="tAreas" style="margin-top:8px">${(T.areas||defaultAreas()).map((a,i)=>`<div class="row" data-id="${esc(a.id)}" style="display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px"><input type="text" value="${esc(a.name)}" maxlength="30" placeholder="Ad" aria-label="Sahə adı"><input type="text" value="${esc(a.desc||'')}" maxlength="60" placeholder="Qısa izah" aria-label="İzah"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
+    <div class="list" id="tAreas" style="margin-top:8px">${(T.areas||defaultAreas()).map((a,i)=>`<div class="row" data-id="${esc(a.id)}" style="display:grid;grid-template-columns:auto 1fr 1.4fr auto;gap:8px;align-items:center"><input type="text" value="${esc(a.name)}" maxlength="30" placeholder="Ad" aria-label="Sahə adı"><input type="text" value="${esc(a.desc||'')}" maxlength="60" placeholder="Qısa izah" aria-label="İzah"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
     <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAddArea" ${(T.areas||[]).length>=8?'disabled':''}>+ Sahə əlavə et</button></div>
     <h3 style="margin-top:18px">Xərc kateqoriyaları və aylıq büdcə</h3>
     <p class="hint">Ümumi büdcə kateqoriyaların cəmidir: <b class="num" id="tTotal">${money(totalBudget())} ₼</b>. Gündəlik limit bundan hesablanır.</p>
     <div class="list" id="tCats" style="margin-top:8px">${S.cats.map((c,i)=>`<div class="crow" data-id="${c.id}" data-color="${c.color}" style="${cc(c)}"><i class="sw"></i><input type="text" value="${esc(c.name)}" maxlength="30" aria-label="Ad" id="cn${i}"><input type="number" min="0" step="10" value="${c.budget}" inputmode="decimal" aria-label="Büdcə, ₼" id="cb${i}" class="num"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
     <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAddCat" ${S.cats.length>=12?'disabled':''}>+ Kateqoriya əlavə et</button></div>
-    <div class="actions" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)"><button class="btn primary" id="tSave">Saxla</button><span class="hint">Bütün hədəflər, vərdişlər, sahələr və kateqoriyalar birlikdə saxlanılır</span></div>
+    <div class="actions" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)"><button class="btn primary" id="tSave">Saxla</button><span class="hint">Sıranı ⠿ ilə sürüşdürüb dəyişin; hamısı birlikdə saxlanılır</span></div>
    </div>
    <div class="panel">
     <h2>Məlumatlar</h2>
@@ -830,8 +833,15 @@ function renderTargets(){
   el.querySelector('#tCats').addEventListener('click',ev=>{if(ev.target.closest('[data-rm]')){ev.target.closest('.crow').remove();recalc()}});
   el.querySelector('#tAddCat').addEventListener('click',()=>{const l=el.querySelector('#tCats');if(l.children.length>=12)return;const used=[...l.children].map(r=>+r.dataset.color);const color=[1,2,3,4,5,6,7,8,9,10,11,12].find(c=>!used.includes(c))||10;const d=document.createElement('div');d.className='crow';d.dataset.id='c'+uid();d.dataset.color=color;d.style.cssText=`--cc:var(--c${color})`;d.innerHTML=`<i class="sw"></i><input type="text" placeholder="Yeni kateqoriya" maxlength="30" aria-label="Ad"><input type="number" min="0" step="10" value="0" inputmode="decimal" aria-label="Büdcə, ₼" class="num"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button>`;l.appendChild(d);d.querySelector('input').focus()});
   el.querySelector('#xCsv')?.addEventListener('click',async()=>{const rows=[['tarix','kateqoriya','mebleg','qeyd']];Object.keys(S.exp).sort().forEach(d=>S.exp[d].items.forEach(i=>rows.push([d,catById(i.cat).name,i.amount,i.note||''])));const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');try{await downloads.save({filename:'xercler-'+todayStr()+'.csv',data:csv});toast('Fayl hazırdır')}catch(e){if(e?.code!=='cancelled')toast('Yükləmə alınmadı')}});
+  const lists=['#tHabits','#tAreas','#tCats'].map(q=>el.querySelector(q));
+  const mkHandle=row=>{if(row.nodeType!==1||row.querySelector('.drag'))return;const h=document.createElement('span');h.className='drag';h.textContent='⠿';h.title='Sıranı dəyişmək üçün sürüşdürün';h.setAttribute('aria-label','Sıranı dəyiş');row.prepend(h)};
+  lists.forEach(l=>{[...l.children].forEach(mkHandle);new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(mkHandle))).observe(l,{childList:true});
+    l.addEventListener('pointerdown',ev=>{const h=ev.target.closest('.drag');if(!h)return;ev.preventDefault();const row=h.parentElement;row.classList.add('dragging');
+      const move=e=>{const rows=[...l.children].filter(r=>r!==row);for(const r of rows){const b=r.getBoundingClientRect();if(e.clientY>=b.top&&e.clientY<=b.bottom){if(e.clientY<b.top+b.height/2)l.insertBefore(row,r);else l.insertBefore(row,r.nextSibling);break}}};
+      const up=()=>{row.classList.remove('dragging');document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);document.removeEventListener('pointercancel',up)};
+      document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up)})});
   el.querySelector('#tAreas').addEventListener('click',ev=>{if(ev.target.closest('[data-rm]'))ev.target.closest('.row').remove()});
-  el.querySelector('#tAddArea').addEventListener('click',()=>{const l=el.querySelector('#tAreas');if(l.children.length>=8)return;const d=document.createElement('div');d.className='row';d.dataset.id='a'+uid();d.style.cssText='display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px';d.innerHTML=`<input type="text" placeholder="Ad" maxlength="30" aria-label="Sahə adı"><input type="text" placeholder="Qısa izah" maxlength="60" aria-label="İzah"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button>`;l.appendChild(d);d.querySelector('input').focus()});
+  el.querySelector('#tAddArea').addEventListener('click',()=>{const l=el.querySelector('#tAreas');if(l.children.length>=8)return;const d=document.createElement('div');d.className='row';d.dataset.id='a'+uid();d.style.cssText='display:grid;grid-template-columns:auto 1fr 1.4fr auto;gap:8px;align-items:center';d.innerHTML=`<input type="text" placeholder="Ad" maxlength="30" aria-label="Sahə adı"><input type="text" placeholder="Qısa izah" maxlength="60" aria-label="İzah"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button>`;l.appendChild(d);d.querySelector('input').focus()});
   el.querySelector('#tAdd').addEventListener('click',()=>{const l=el.querySelector('#tHabits');if(l.children.length>=8)return;const d=document.createElement('div');d.className='row';d.innerHTML=`<input type="text" placeholder="Yeni vərdiş" maxlength="40"><button class="btn sm ghost danger" data-rm="x" aria-label="Sil">✕</button>`;l.appendChild(d);d.querySelector('input').focus()});
   el.querySelector('#tSave').addEventListener('click',async()=>{
     const g=(id,def)=>num(el.querySelector(id).value)??def;
