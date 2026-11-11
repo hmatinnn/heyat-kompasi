@@ -189,7 +189,7 @@ svg text{font-family:var(--body);fill:var(--muted)}
 .catrow .bar{grid-column:2/-1;margin-top:2px}
 .catrow .v{font-family:var(--display);font-weight:700;white-space:nowrap}
 .catrow .v small{font-family:var(--body);font-weight:600;color:var(--muted);font-size:12px}
-.list .crow{display:grid;grid-template-columns:auto 12px 1fr 110px auto;gap:8px;align-items:center}
+.list .crow{display:grid;grid-template-columns:auto 12px 1fr auto;gap:8px;align-items:center}
 .drag{cursor:grab;touch-action:none;user-select:none;color:var(--faint);font-size:16px;line-height:1;padding:8px 4px;border-radius:6px;flex:none}
 .drag:hover{color:var(--fg);background:var(--surface-2)}
 .dragging{opacity:.55;outline:2px dashed var(--accent);outline-offset:2px;border-radius:8px}
@@ -232,7 +232,7 @@ svg .hit:hover{fill:var(--fg);fill-opacity:.06}
 'use strict';
 const KEY='heyat-kompasi-v1';
 const AREA_PSIX={id:'psix',name:'Psixoloji sağlamlıq',desc:'Əhval, stress, enerji (Gün bölməsindən, avtomatik)'};
-const AREA_FIN={id:'fin',name:'Maliyyə',desc:'Yığım faizi və büdcəyə əməl (avtomatik)'};
+const AREA_FIN={id:'fin',name:'Maliyyə',desc:'Yığım faizi (avtomatik)'};
 const defaultAreas=()=>[{id:'sosial',name:'Sosial həyat',desc:'Dostlar, ailə, görüşlər, ünsiyyət'},{id:'karyera',name:'Karyera',desc:'İş nəticələri və peşəkar inkişaf'},{id:'oyrenme',name:'Öyrənmə və hobbi',desc:'Kitab, kurs, yaradıcılıq, bərpa'}];
 let ASPECTS=[],SHORT=[],AUTO=[],AIDS=[];
 function rebuildAreas(){const list=[AREA_PSIX,...((S.targets&&S.targets.areas&&S.targets.areas.length)?S.targets.areas:defaultAreas()),AREA_FIN];AIDS=list.map(a=>a.id);ASPECTS=list.map(a=>[a.name,a.desc||'']);SHORT=list.map(a=>a.name.length>11?a.name.split(' ')[0]:a.name);AUTO=[0,list.length-1]}
@@ -291,7 +291,7 @@ function expItems(ym){const out=[];Object.keys(S.exp).filter(d=>d.startsWith(ym)
 function expDay(d){const x=S.exp[d];return x?x.items.reduce((p,c)=>p+c.amount,0):0}
 function expSum(items){return items.reduce((p,c)=>p+c.amount,0)}
 function expMonth(ym){return expSum(expItems(ym))}
-function totalBudget(){return S.cats.reduce((p,c)=>p+(c.budget||0),0)}
+function totalBudget(){return 0}
 function byCat(items){const m={};items.forEach(i=>{m[i.cat]=(m[i.cat]||0)+i.amount});return m}
 function niceStep(max){const raw=max/4,p=Math.pow(10,Math.floor(Math.log10(raw)));const n=raw/p;return (n<1.5?1:n<3.5?2:n<7.5?5:10)*p}
 
@@ -562,15 +562,15 @@ function renderPanel(){
   }
   if(panelTab==='maliyye'){
     h+=`<div class="grid g3">`;
-    h+=`<div class="tile"><span class="label">Xərc, bu ay</span><span class="val num">${money(r.monthSpent)}<small>₼</small></span><span class="sub"><span>Büdcə ${money(r.budget)} ₼</span>${r.budget?`<span class="pill ${spendGrade(r.monthSpent/r.budget)}">${spendGrade(r.monthSpent/r.budget)==='good'?'büdcədə':spendGrade(r.monthSpent/r.budget)==='warn'?'sərhəddə':'aşıb'}</span>`:''}</span>${r.budget?`<div class="bar ${spendGrade(r.monthSpent/r.budget)}"><b style="width:${Math.min(100,r.monthSpent/r.budget*100)}%"></b></div>`:''}</div>`;
+    {const its=expItems(todayStr().slice(0,7));const dd=new Date().getDate();h+=`<div class="tile"><span class="label">Xərc, bu ay</span><span class="val num">${money(r.monthSpent)}<small>₼</small></span><span class="sub"><span>${its.length} əməliyyat · gündə orta ${money(r.monthSpent/dd,1)} ₼</span></span></div>`;}
     h+=tile('Yığım faizi',pct(r.savRate),'',r.fin?`${f0(r.fin.savings)} / ${f0(r.fin.income)} ₼ · ${fmtMonth(r.finMonth)}`:'Aylıq bölmədə gəliri qeyd edin',r.savRate!=null?r.savRate/T.savings:null);
     h+=tile('Borc yükü',pct(r.debtR),'',r.fin?`${f0(r.fin.debt||0)} ₼ aylıq ödəniş`:'Gəlirin faizi kimi',r.debtR!=null?(r.debtR<=10?1:r.debtR<=30?.8:.4):null);
     h+=`</div>`;
     const ym=todayStr().slice(0,7),items=expItems(ym),bc=byCat(items),total=expSum(items);
     const last6=(()=>{const a=[];const [y,m]=ym.split('-').map(Number);for(let k=5;k>=0;k--){const d=new Date(y,m-1-k,1);a.push(d.getFullYear()+'-'+pad(d.getMonth()+1))}return a})();
     h+=`<div class="section grid g2 stack">`;
-    h+=`<div class="panel"><h2>Bu ay kateqoriyalar üzrə</h2><p class="small muted">${fmtMonth(ym)} · ${items.length} əməliyyat · <a href="#qeyd-maliyye" style="color:var(--accent-ink);font-weight:700;text-decoration:none">Xərc əlavə et →</a></p><div style="margin-top:10px">${total?[...S.cats].filter(c=>bc[c.id]).sort((a,b)=>(bc[b.id]||0)-(bc[a.id]||0)).map(c=>{const v=bc[c.id],rr=c.budget?v/c.budget:null,g=spendGrade(rr);return `<div class="catrow" style="${cc(c)}"><i class="dot"></i><span>${esc(c.name)}</span><span class="v num">${money(v)} ₼ <small>/ ${money(c.budget)}</small></span><div class="bar ${g}"><b style="width:${rr==null?0:Math.min(100,rr*100)}%"></b></div></div>`}).join(''):'<p class="empty">Bu ay xərc yoxdur</p>'}</div></div>`;
-    h+=`<div class="panel"><h2>Son 6 ay xərc</h2><p class="small muted">Kəsik xətt ümumi büdcədir</p><div style="margin-top:8px">${expBar(last6.map(k=>expMonth(k)),last6.map(k=>MONTHS[+k.split('-')[1]-1]),{target:r.budget||null,allLabels:true,tips:last6.map(k=>fmtMonth(k)+'\n'+money(expMonth(k),2)+' ₼'+(r.budget?' · büdcənin '+pct(expMonth(k)/r.budget*100):''))})}</div>`;
+    h+=`<div class="panel"><h2>Bu ay kateqoriyalar üzrə</h2><p class="small muted">${fmtMonth(ym)} · ${items.length} əməliyyat · cəmi ${money(total,2)} ₼ · <a href="#qeyd-maliyye" style="color:var(--accent-ink);font-weight:700;text-decoration:none">Xərc əlavə et →</a></p><div style="margin-top:10px">${total?[...S.cats].filter(c=>bc[c.id]).sort((a,b)=>(bc[b.id]||0)-(bc[a.id]||0)).map(c=>{const v=bc[c.id],sh=v/total*100;return `<div class="catrow" style="${cc(c)}"><i class="dot"></i><span>${esc(c.name)}</span><span class="v num">${money(v)} ₼ <small>· ${pct(sh)}</small></span><div class="bar"><b style="width:${sh}%;background:var(--cc)"></b></div></div>`}).join(''):'<p class="empty">Bu ay xərc yoxdur</p>'}</div></div>`;
+    h+=`<div class="panel"><h2>Son 6 ay xərc</h2><p class="small muted">Aylıq cəm</p><div style="margin-top:8px">${expBar(last6.map(k=>expMonth(k)),last6.map(k=>MONTHS[+k.split('-')[1]-1]),{target:r.budget||null,allLabels:true,tips:last6.map(k=>fmtMonth(k)+'\n'+money(expMonth(k),2)+' ₼'+(r.budget?' · büdcənin '+pct(expMonth(k)/r.budget*100):''))})}</div>`;
     if(r.months.length){h+=`<div class="tscroll" style="margin-top:12px"><table><thead><tr><th>Ay</th><th>Gəlir</th><th>Xərc</th><th>Yığım %</th></tr></thead><tbody>`;[...r.months].reverse().slice(0,6).forEach(k=>{const m=S.months[k];const isCur=k===todayStr().slice(0,7);let ex=m.expense>0?m.expense:expMonth(k);let proj=false;if(!(m.expense>0)&&isCur&&ex>0){ex=Math.round(ex/new Date().getDate()*daysInMonth(k));proj=true}h+=`<tr><td><b>${fmtMonth(k)}</b></td><td class="num">${f0(m.income)}</td><td class="num">${f0(ex)}${proj?' <span class="faint">(proqnoz)</span>':''}</td><td class="num">${m.income?pct(m.savings/m.income*100):'—'}</td></tr>`});h+=`</tbody></table></div>`}
     h+=`</div></div>`;
     h+=sourceLine([{sec:'maliyye',label:'Maliyyə · xərclər',kind:'day',last:lastLogged('xerc')},{sec:'maliyye',label:'Maliyyə · aylıq',kind:'month',last:lastLogged('ay')}]);
@@ -589,7 +589,7 @@ function renderPanel(){
     if(focusIdx!=null){const fv=cur[focusIdx],pv=prev?prev[focusIdx]:null;const d=fv!=null&&pv!=null?fv-pv:null;
       h+=`<div class="panel" style="border-color:var(--accent)"><div class="sechead"><h2>Fokus sahəsi</h2><span class="badge day">${cm&&cm.focus!=null?fmtMonth(showKey):'keçən aydan'}</span></div><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:8px"><div><div class="clock" style="font-size:20px">${esc(ASPECTS[focusIdx][0])}</div><div class="small muted">${esc(ASPECTS[focusIdx][1])}</div></div><div style="text-align:right"><div class="val num" style="font-family:var(--display);font-size:26px;font-weight:700">${fv!=null?f1(fv):'—'}<small class="muted" style="font-size:13px">/10</small></div><div class="small ${d==null?'muted':d>0?'':''}" style="color:${d==null?'var(--muted)':d>0?'var(--good)':d<0?'var(--bad)':'var(--muted)'}">${d==null?(pv!=null?'':'əvvəlki ay yoxdur'):d>0?'+'+f1(d)+' əvvəlki aya görə':d<0?'−'+f1(-d)+' əvvəlki aya görə':'dəyişməyib'}</div></div></div></div>`}
     else h+=`<div class="panel"><h2>Fokus sahəsi</h2><p class="small muted" style="margin-top:4px">Aylıq qiymətləndirmədə gələn ay üçün bir fokus sahəsi seçin; burada onun gedişini izləyəcəksiniz.</p></div>`;
-    h+=`<div class="panel"><h2>Avtomatik hesablanan sahələr</h2><p class="small muted">${fmtMonth(ym)} · gündəlik qeydlərdən hesablanır, əl ilə dəyişdirilmir.</p><div class="hbars">${AUTO.map(i=>{const av=auto[AIDS[i]];const g=av==null?'none':av>=7?'good':av>=5?'warn':'bad';return `<div class="hbar"><span>${esc(ASPECTS[i][0])}</span><div class="bar ${g}"><b style="width:${av?av*10:0}%"></b></div><b class="num">${av!=null?f1(av):'—'}</b></div>`}).join('')}</div><p class="hint" style="margin-top:10px">Psixoloji: Gün bölməsindəki əhval 50%, stress 30%, enerji 20% · Maliyyə: yığım faizi/hədəf və büdcə tempi</p></div>`;
+    h+=`<div class="panel"><h2>Avtomatik hesablanan sahələr</h2><p class="small muted">${fmtMonth(ym)} · gündəlik qeydlərdən hesablanır, əl ilə dəyişdirilmir.</p><div class="hbars">${AUTO.map(i=>{const av=auto[AIDS[i]];const g=av==null?'none':av>=7?'good':av>=5?'warn':'bad';return `<div class="hbar"><span>${esc(ASPECTS[i][0])}</span><div class="bar ${g}"><b style="width:${av?av*10:0}%"></b></div><b class="num">${av!=null?f1(av):'—'}</b></div>`}).join('')}</div><p class="hint" style="margin-top:10px">Psixoloji: Gün bölməsindəki əhval 50%, stress 30%, enerji 20% · Maliyyə: yığım faizi / hədəf</p></div>`;
     h+=`</div></div>`;
     // trends
     const keys6=(()=>{const a=[];const [y,m]=ym.split('-').map(Number);for(let k=5;k>=0;k--){const d=new Date(y,m-1-k,1);a.push(d.getFullYear()+'-'+pad(d.getMonth()+1))}return a})();
@@ -713,7 +713,8 @@ function qeydMaliyye(T){
       <div class="field"><label for="qAmt">Məbləğ, ₼</label><input id="qAmt" class="amount num" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.00"></div>
       <div class="field"><label for="qNote">Qeyd (istəyə bağlı)</label><input id="qNote" type="text" maxlength="80" placeholder="məs. Bazar, taksi, dərman"></div>
       <button class="btn primary" id="qAdd">Əlavə et</button></div>
-     <div class="chips" id="qCats">${S.cats.map(c=>`<button type="button" class="chip ${qCat===c.id?'on':''}" data-c="${c.id}" style="${cc(c)}"><i></i>${esc(c.name)}</button>`).join('')}</div>
+     <div class="chips" id="qCats">${S.cats.map(c=>`<button type="button" class="chip ${qCat===c.id?'on':''}" data-c="${c.id}" style="${cc(c)}"><i></i>${esc(c.name)}</button>`).join('')}${S.cats.length<12?`<button type="button" class="chip" id="qNewCat" style="border-style:dashed;color:var(--muted)">+ Kateqoriya</button>`:''}</div>
+     <div id="qNewCatBox" hidden style="display:flex;gap:8px;margin-top:8px"><input type="text" id="qNewCatName" maxlength="30" placeholder="Yeni kateqoriyanın adı"><button type="button" class="btn sm primary" id="qNewCatOk">Əlavə et</button><button type="button" class="btn sm ghost" id="qNewCatNo">Ləğv</button></div>
      <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><label for="qDate" style="margin:0">Tarix</label><input id="qDate" type="date" value="${selDay}" max="${t}" style="width:auto"><span class="hint" id="qHint"></span></div></div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px"><h3>${fmtMonth(selMonth)} xərcləri <span class="muted small" style="font-weight:600">· ${items.length} əməliyyat · ${money(expSum(items),2)} ₼</span></h3><input type="month" class="mPick" value="${selMonth}" max="${t.slice(0,7)}" style="width:auto"></div>
     <div style="margin-top:4px">${itemsList(items)}</div>
@@ -767,7 +768,12 @@ function bindQeyd(el,T){
     el.querySelector('#hSave').addEventListener('click',async()=>{const sc=k=>{const b=el.querySelector(`[data-scale="${k}"] .on`);return b?+b.dataset.v:null};const habits={};hb.querySelectorAll('input:checked').forEach(c=>habits[c.dataset.h]=true);await saveDayPart(selDay,{habits,mood:sc('mood'),energy:sc('energy'),stress:sc('stress'),note:el.querySelector('#dNote').value.trim()});toast('Gün saxlanıldı');renderAll()});}
   // expenses
   const qa=el.querySelector('#qAmt');
-  if(qa){el.querySelectorAll('#qCats .chip').forEach(b=>b.addEventListener('click',()=>{qCat=b.dataset.c;el.querySelectorAll('#qCats .chip').forEach(x=>x.classList.toggle('on',x===b));el.querySelector('#qHint').textContent=''}));
+  if(qa){const nb=el.querySelector('#qNewCatBox');const showNew=v=>{nb.hidden=!v;nb.style.display=v?'flex':'none';if(v)el.querySelector('#qNewCatName').focus()};showNew(false);
+    el.querySelector('#qNewCat')?.addEventListener('click',()=>showNew(true));
+    el.querySelector('#qNewCatNo').addEventListener('click',()=>showNew(false));
+    const addCat=async()=>{const name=el.querySelector('#qNewCatName').value.trim();if(!name)return;if(S.cats.some(c=>c.name.toLowerCase()===name.toLowerCase())){toast('Bu adda kateqoriya var');return}if(demo){demo=false;S=await Store.load();setStatus()}const used=S.cats.map(c=>c.color);const color=[1,2,3,4,5,6,7,8,9,10,11,12].find(c=>!used.includes(c))||10;const c={id:'c'+uid(),name,budget:0,color};S.cats=[...S.cats,c];qCat=c.id;await Store.saveTargets();toast('Kateqoriya əlavə olundu: '+name);renderAll();document.getElementById('qAmt')?.focus()};
+    el.querySelector('#qNewCatOk').addEventListener('click',addCat);el.querySelector('#qNewCatName').addEventListener('keydown',e=>{if(e.key==='Enter')addCat()});
+    el.querySelectorAll('#qCats .chip[data-c]').forEach(b=>b.addEventListener('click',()=>{qCat=b.dataset.c;el.querySelectorAll('#qCats .chip[data-c]').forEach(x=>x.classList.toggle('on',x===b));el.querySelector('#qHint').textContent=''}));
     const add=async()=>{const amt=num(qa.value),date=el.querySelector('#qDate').value||todayStr(),note=el.querySelector('#qNote').value.trim(),hint=el.querySelector('#qHint');
       if(!amt||amt<=0){hint.textContent='Məbləği daxil edin';qa.focus();return}if(!qCat){hint.textContent='Kateqoriya seçin';return}
       if(demo){demo=false;S=await Store.load();setStatus()}
@@ -809,9 +815,9 @@ function renderTargets(){
     <p class="hint">Psixoloji sağlamlıq və Maliyyə avtomatik hesablanır, siyahıda deyil. Ən çox 8 sahə. Sahəni silsəniz keçmiş ayların balı qalır, amma göstərilmir.</p>
     <div class="list" id="tAreas" style="margin-top:8px">${(T.areas||defaultAreas()).map((a,i)=>`<div class="row" data-id="${esc(a.id)}" style="display:grid;grid-template-columns:auto 1fr 1.4fr auto;gap:8px;align-items:center"><input type="text" value="${esc(a.name)}" maxlength="30" placeholder="Ad" aria-label="Sahə adı"><input type="text" value="${esc(a.desc||'')}" maxlength="60" placeholder="Qısa izah" aria-label="İzah"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
     <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAddArea" ${(T.areas||[]).length>=8?'disabled':''}>+ Sahə əlavə et</button></div>
-    <h3 style="margin-top:18px">Xərc kateqoriyaları və aylıq büdcə</h3>
-    <p class="hint">Ümumi büdcə kateqoriyaların cəmidir: <b class="num" id="tTotal">${money(totalBudget())} ₼</b>. Gündəlik limit bundan hesablanır.</p>
-    <div class="list" id="tCats" style="margin-top:8px">${S.cats.map((c,i)=>`<div class="crow" data-id="${c.id}" data-color="${c.color}" style="${cc(c)}"><i class="sw"></i><input type="text" value="${esc(c.name)}" maxlength="30" aria-label="Ad" id="cn${i}"><input type="number" min="0" step="10" value="${c.budget}" inputmode="decimal" aria-label="Büdcə, ₼" id="cb${i}" class="num"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
+    <h3 style="margin-top:18px">Xərc kateqoriyaları</h3>
+    <p class="hint">Xərcləri qruplaşdırmaq üçündür, büdcə yoxdur. Ən çox 12. Kateqoriyanı silsəniz köhnə xərclər "Silinmiş kateqoriya" kimi qalır.</p>
+    <div class="list" id="tCats" style="margin-top:8px">${S.cats.map((c,i)=>`<div class="crow" data-id="${c.id}" data-color="${c.color}" style="${cc(c)}"><i class="sw"></i><input type="text" value="${esc(c.name)}" maxlength="30" aria-label="Ad" id="cn${i}"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button></div>`).join('')}</div>
     <div class="actions" style="margin-top:8px"><button class="btn sm" id="tAddCat" ${S.cats.length>=12?'disabled':''}>+ Kateqoriya əlavə et</button></div>
     <div class="actions" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)"><button class="btn primary" id="tSave">Saxla</button><span class="hint">Sıranı ⠿ ilə sürüşdürüb dəyişin; hamısı birlikdə saxlanılır</span></div>
    </div>
@@ -828,10 +834,10 @@ function renderTargets(){
    </div>
   </div>`;
   el.querySelector('#tHabits').addEventListener('click',ev=>{const b=ev.target.closest('[data-rm]');if(b)b.closest('.row').remove()});
-  const recalc=()=>{let t=0;el.querySelectorAll('#tCats input[type=number]').forEach(i=>t+=num(i.value)||0);el.querySelector('#tTotal').textContent=money(t)+' ₼'};
+  const recalc=()=>{};
   el.querySelector('#tCats').addEventListener('input',recalc);
   el.querySelector('#tCats').addEventListener('click',ev=>{if(ev.target.closest('[data-rm]')){ev.target.closest('.crow').remove();recalc()}});
-  el.querySelector('#tAddCat').addEventListener('click',()=>{const l=el.querySelector('#tCats');if(l.children.length>=12)return;const used=[...l.children].map(r=>+r.dataset.color);const color=[1,2,3,4,5,6,7,8,9,10,11,12].find(c=>!used.includes(c))||10;const d=document.createElement('div');d.className='crow';d.dataset.id='c'+uid();d.dataset.color=color;d.style.cssText=`--cc:var(--c${color})`;d.innerHTML=`<i class="sw"></i><input type="text" placeholder="Yeni kateqoriya" maxlength="30" aria-label="Ad"><input type="number" min="0" step="10" value="0" inputmode="decimal" aria-label="Büdcə, ₼" class="num"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button>`;l.appendChild(d);d.querySelector('input').focus()});
+  el.querySelector('#tAddCat').addEventListener('click',()=>{const l=el.querySelector('#tCats');if(l.children.length>=12)return;const used=[...l.children].map(r=>+r.dataset.color);const color=[1,2,3,4,5,6,7,8,9,10,11,12].find(c=>!used.includes(c))||10;const d=document.createElement('div');d.className='crow';d.dataset.id='c'+uid();d.dataset.color=color;d.style.cssText=`--cc:var(--c${color})`;d.innerHTML=`<i class="sw"></i><input type="text" placeholder="Yeni kateqoriya" maxlength="30" aria-label="Ad"><button class="btn sm ghost danger" data-rm aria-label="Sil">✕</button>`;l.appendChild(d);d.querySelector('input').focus()});
   el.querySelector('#xCsv')?.addEventListener('click',async()=>{const rows=[['tarix','kateqoriya','mebleg','qeyd']];Object.keys(S.exp).sort().forEach(d=>S.exp[d].items.forEach(i=>rows.push([d,catById(i.cat).name,i.amount,i.note||''])));const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');try{await downloads.save({filename:'xercler-'+todayStr()+'.csv',data:csv});toast('Fayl hazırdır')}catch(e){if(e?.code!=='cancelled')toast('Yükləmə alınmadı')}});
   const lists=['#tHabits','#tAreas','#tCats'].map(q=>el.querySelector(q));
   const mkHandle=row=>{if(row.nodeType!==1||row.querySelector('.drag'))return;const h=document.createElement('span');h.className='drag';h.textContent='⠿';h.title='Sıranı dəyişmək üçün sürüşdürün';h.setAttribute('aria-label','Sıranı dəyiş');row.prepend(h)};
@@ -849,7 +855,7 @@ function renderTargets(){
     if(demo){demo=false;S=await Store.load();setStatus()}
     const areas=[...el.querySelectorAll('#tAreas .row')].map(r=>{const ins=r.querySelectorAll('input');return {id:r.dataset.id,name:ins[0].value.trim(),desc:ins[1].value.trim()}}).filter(a=>a.name);
     S.targets={wake:el.querySelector('#tWake').value||'07:00',bed:el.querySelector('#tBed').value||'23:00',tol:g('#tTol',30),sleep:g('#tSleep',8),savings:g('#tSav',20),habits:habits.length?habits:defaultTargets().habits,areas:areas.length?areas:defaultAreas()};
-    const cats=[...el.querySelectorAll('#tCats .crow')].map(r=>({id:r.dataset.id,name:r.querySelector('input[type=text]').value.trim(),budget:num(r.querySelector('input[type=number]').value)||0,color:+r.dataset.color})).filter(c=>c.name);
+    const cats=[...el.querySelectorAll('#tCats .crow')].map(r=>({id:r.dataset.id,name:r.querySelector('input[type=text]').value.trim(),budget:0,color:+r.dataset.color})).filter(c=>c.name);
     S.cats=cats.length?cats:DEFAULT_CATS();if(!S.cats.find(c=>c.id===qCat))qCat=null;
     await Store.saveTargets();toast('Hədəflər saxlanıldı');renderAll();
   });
